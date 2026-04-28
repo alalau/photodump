@@ -129,7 +129,7 @@ window.addEventListener('pointerup', (event) => {
     } else {
         // Fallback for extremely fast swipes where pointerup fires before pointermove threshold was crossed natively
         if (zoomedMesh && isMobile) {
-            setZoomMesh(null); 
+            setZoomMesh(null);
         }
     }
 });
@@ -306,12 +306,12 @@ async function getAllPhotoUrls() {
 
 async function loadAlbumImages(albumName) {
     currentAlbum = albumName;
-    
+
     const pageTitle = document.getElementById('page-title');
     if (pageTitle) {
-        pageTitle.textContent = albumName === 'All photos' ? 'PlaceholderTitle' : albumName;
+        pageTitle.textContent = albumName === 'All photos' ? 'Automatic' : albumName;
     }
-    
+
     let newUrls = [];
 
     if (albumName === 'All photos') {
