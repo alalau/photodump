@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>photo dump</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="ui-container">
+        <!-- Advanced SVG Filter for Gooey / Ink Bleed Effect -->
+        <svg style="display:none; width:0; height:0; position:absolute;">
+            <defs>
+                <filter id="ink-bleed" color-interpolation-filters="sRGB">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.01" result="blur" id="bleed-blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="
+                        1 0 0 0 0  
+                        0 1 0 0 0  
+                        0 0 1 0 0  
+                        0 0 0 30 -10" result="goo" />
+                    <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="4" result="noise" />
+                    <feDisplacementMap in="goo" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G"
+                        result="blob" id="bleed-displacement" />
+                </filter>
+            </defs>
+        </svg>
+
+        <!-- Zoom Navigation (Hidden unless zoomed) -->
+        <div id="zoom-ui">
+            <div id="nav-buttons">
+                <div class="nav-btn-container left">
+                    <button id="btn-left" class="nav-btn icon-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M15.293 1.29289C15.6835 0.902369 16.3165 0.902369 16.707 1.29289C17.0976 1.68342 17.0976 2.31643 16.707 2.70696L7.41406 11.9999L16.707 21.2929C17.0976 21.6834 17.0976 22.3164 16.707 22.707C16.3165 23.0975 15.6835 23.0975 15.293 22.707L4.58594 11.9999L15.293 1.29289Z"
+                                fill="#FFF" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="nav-btn-container right">
+                    <button id="btn-right" class="nav-btn icon-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M8.70703 1.29289C8.31651 0.902369 7.68349 0.902369 7.29297 1.29289C6.90244 1.68342 6.90244 2.31643 7.29297 2.70696L16.5859 11.9999L7.29297 21.2929C6.90244 21.6834 6.90244 22.3164 7.29297 22.707C7.68349 23.0975 8.31651 23.0975 8.70703 22.707L19.4141 11.9999L8.70703 1.29289Z"
+                                fill="#FFF" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="scrim"></div>
+
+        <!-- Album Menu (Fullscreen Takeover) -->
+        <div id="album-menu">
+            <ul id="album-list">
+                <li>All photos</li>
+                <!-- Albums dynamically indexed securely from native Python HTTP local directories -->
+            </ul>
+        </div>
+
+        <!-- Global Menu Toggle Button -->
+        <div id="menu-btn-container">
+            <button id="menu-btn" class="icon-btn">
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </button>
+        </div>
+
+        <div id="top-bar">
+            <div class="page-title-container">
+                <div id="page-title">PlaceholderTitle</div>
+                <div id="page-subtitle">Photography by<br>Kirby Sharp</div>
+            </div>
+        </div>
+
+        <!-- Custom Cursor Object -->
+        <div id="custom-cursor"></div>
+    </div>
+
+    <!-- Import map to use three.js from CDN without build step -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>

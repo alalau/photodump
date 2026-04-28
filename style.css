@@ -1,0 +1,376 @@
+@font-face {
+    font-family: 'Libre Caslon Condensed';
+    src: url('fonts/LibreCaslonCondensed/LibreCaslonCondensed-Regular.woff2') format('woff2');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Libre Caslon Condensed';
+    src: url('fonts/LibreCaslonCondensed/LibreCaslonCondensed-Medium.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Libre Caslon Condensed';
+    src: url('fonts/LibreCaslonCondensed/LibreCaslonCondensed-Bold.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    cursor: none !important;
+    font-family: "Libre Franklin", sans-serif;
+    /* Hijack system cursor globally */
+}
+
+/* Custom Hardware-Accelerated Cursor */
+#custom-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 32px;
+    height: 32px;
+    background-color: #ffffff;
+    /* White is mathematically required for difference to invert correctly */
+    mix-blend-mode: difference;
+    border-radius: 50%;
+    pointer-events: none;
+    /* Must not steal clicks */
+    z-index: 10000;
+    /* Float absolutely above the entire DOM stack */
+    will-change: transform;
+    /* Opt-in to GPU layer rendering for flawless 60fps tracking */
+    transition: width 150ms ease, height 150ms ease, opacity 150ms ease;
+}
+
+#custom-cursor.hidden {
+    width: 0px;
+    height: 0px;
+    opacity: 0;
+}
+
+body {
+    background-color: #000000;
+    overflow: hidden;
+    overscroll-behavior: none;
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Inter', sans-serif;
+    color: #ffffff;
+}
+
+#canvas-container {
+    width: 100%;
+    height: 100%;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    touch-action: none;
+    /* Strip native iOS/Android swipe behaviors cleanly allowing manual code hooks */
+}
+
+#zoom-ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    /* Let clicks pass down to canvas seamlessly */
+    z-index: 100;
+    transition: opacity 0.3s ease;
+}
+
+/* Universal UI Application Button */
+.icon-btn {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(136deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.3) 49.3695%, rgba(0, 0, 0, 0.4) 100%) rgba(0, 0, 0, 0);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transition: all 150ms ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    font-size: 3rem;
+    color: white;
+}
+
+.icon-btn .bar {
+    width: 24px;
+    height: 2px;
+    background: currentColor;
+    transition: all 150ms ease;
+    transform-origin: center;
+    border-radius: 4px;
+}
+
+.nav-btn-container {
+    pointer-events: none;
+    padding: 24px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 250ms ease;
+}
+
+.nav-btn-container.left {
+    left: 0;
+    margin-left: -120px;
+}
+
+.is-zoomed .nav-btn-container.left {
+    margin-left: 0;
+}
+
+.nav-btn-container.right {
+    right: 0;
+    margin-right: -120px;
+}
+
+.is-zoomed .nav-btn-container.right {
+    margin-right: 0;
+}
+
+#ui-container.is-zoomed .nav-btn-container {
+    pointer-events: auto;
+    /* Catch clicks */
+}
+
+.nav-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+#btn-left {
+    left: 30px;
+}
+
+#btn-right {
+    right: 30px;
+}
+
+#menu-btn-container {
+    position: fixed;
+    bottom: 0px;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: all 150ms ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    padding: 32px;
+    transition: all 250ms ease;
+}
+
+.is-zoomed #menu-btn-container {
+    margin-bottom: -120px;
+}
+
+
+/* Global Menu Toggle Button */
+#menu-btn {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(136deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.3) 49.3695%, rgba(0, 0, 0, 0.4) 100%) rgba(0, 0, 0, 0);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transition: all 150ms ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+#menu-btn .bar {
+    width: 24px;
+    height: 2px;
+    background: white;
+    transition: all 150ms ease;
+    transform-origin: center;
+}
+
+/* X State Morphing */
+#menu-btn-container.is-active #menu-btn .bar:nth-child(1) {
+    transform: translateY(4px) rotate(45deg);
+}
+
+#menu-btn-container.is-active #menu-btn .bar:nth-child(2) {
+    transform: translateY(-4px) rotate(-45deg);
+}
+
+/* Hover Physics rigorously isolated strictly to pointer environments capable of pure hovering natively */
+@media (hover: hover) {
+
+    #menu-btn-container:hover .icon-btn,
+    .nav-btn-container:hover .icon-btn,
+    .icon-btn:hover {
+        background: rgba(255, 255, 255, 1);
+        transform: scale(1.1);
+        mix-blend-mode: difference;
+        color: black;
+    }
+
+    .icon-btn svg path {
+        transition: all 150ms ease;
+    }
+
+    .nav-btn-container:hover .icon-btn svg path {
+        fill: #000;
+    }
+
+    #menu-btn-container:hover #menu-btn .bar {
+        background: rgba(0, 0, 0, 1);
+    }
+}
+
+#scrim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    /* Deep cinematic grounding */
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    z-index: 990;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 300ms ease;
+}
+
+#scrim.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Album Menu (Fullscreen Takeover) */
+#album-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 998;
+    /* Directly underneath button */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-y: auto;
+    /* Allow scrolling */
+    padding: 120px 0;
+    /* Huge spacious padding bounds */
+
+    /* Default Hidden Interaction Mechanics */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 300ms ease;
+}
+
+#album-menu.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    /* Absorb clicks & enable scrolling */
+}
+
+#album-menu ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    text-align: center;
+    margin: auto 0;
+    /* Distribute cleanly naturally */
+}
+
+#album-menu li {
+    font-family: 'Libre Caslon Condensed', serif;
+    font-size: clamp(3.5rem, 12vw, 15rem);
+    font-weight: 400;
+    letter-spacing: -0.035em;
+    transition: all 150ms ease, transform 150ms ease;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+}
+
+#album-menu li:hover {
+    color: white;
+    /* transform: scale(1.025); */
+    /* Retain the scale effect, shift filter logic to javascript cleanly */
+}
+
+#top-bar {
+    display: flex;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    transition: all 250ms ease;
+}
+
+.is-zoomed #top-bar {
+    margin-top: -120px;
+}
+
+#page-title {
+    display: inline-block;
+    font-size: 40px;
+    font-family: 'Libre Caslon Condensed', serif;
+}
+
+#page-subtitle {
+    display: inline-block;
+}
+
+.page-title-container {
+    display: flex;
+    margin: 0 auto;
+    gap: 8px;
+    padding: 24px;
+    align-items: center;
+    font-weight: 300;
+}
+
+@media (max-width: 520px) {
+    #page-title {
+        font-size: 24px;
+    }
+
+    #page-subtitle {
+        font-size: 10px;
+    }
+
+    #nav-buttons {
+        display: none !important;
+    }
+}
+
+/* Disable Custom Cursor on Touch Devices / Mobile natively */
+@media (hover: none),
+(pointer: coarse) {
+    #custom-cursor {
+        display: none !important;
+    }
+
+    * {
+        cursor: auto !important;
+    }
+}
