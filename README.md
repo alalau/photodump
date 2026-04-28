@@ -1,6 +1,6 @@
-# Photodump - 3D Photo Gallery
+# Photodump - Infinite Canvas Photo Gallery
 
-This site is designed to dynamically read your photo collections and display them in a high-performance infinite grid. 
+This site is designed to dynamically display your photo collections in a high-performance infinite grid. 
 
 ## How to Add or Update Albums
 
