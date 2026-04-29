@@ -29,7 +29,12 @@ const loaderCircle = document.getElementById('loader-circle');
 const circumference = 2 * Math.PI * 47; // Radius is 47
 
 // Loading Manager for elegant entry
+THREE.DefaultLoadingManager.onStart = () => {
+    if (loaderCircle) loaderCircle.style.strokeDashoffset = circumference;
+};
+
 THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    if (!itemsTotal) return;
     const progress = itemsLoaded / itemsTotal;
     if (loaderCircle) {
         const offset = circumference - (progress * circumference);
@@ -379,7 +384,16 @@ async function loadAlbumImages(albumName) {
         newUrls = await fetchPhotosForAlbum(albumName);
     }
 
-    if (newUrls.length === 0) return; // Failsafe if directory is physically empty
+    if (newUrls.length === 0) {
+        console.warn("No photos found. If this is a live server, directory listing may be disabled.");
+        // Fail-safe: Reveal the site anyway so it's not stuck on a black screen
+        setTimeout(() => {
+            if (loader) loader.classList.add('fade-out');
+            if (uiContainer) uiContainer.classList.add('visible');
+            if (container) container.classList.add('visible');
+        }, 500);
+        return;
+    }
 
     const newTextures = newUrls.map(url => {
         const tex = textureLoader.load(url);
