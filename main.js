@@ -25,12 +25,16 @@ let mouseDownPos = { x: 0, y: 0 };
 
 const uiContainer = document.getElementById('ui-container');
 const loader = document.getElementById('loader');
-const loaderText = document.getElementById('loader-text');
+const loaderCircle = document.getElementById('loader-circle');
+const circumference = 2 * Math.PI * 47; // Radius is 47
 
 // Loading Manager for elegant entry
 THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-    const progress = Math.round((itemsLoaded / itemsTotal) * 100);
-    if (loaderText) loaderText.textContent = `${progress}%`;
+    const progress = itemsLoaded / itemsTotal;
+    if (loaderCircle) {
+        const offset = circumference - (progress * circumference);
+        loaderCircle.style.strokeDashoffset = offset;
+    }
 };
 
 THREE.DefaultLoadingManager.onLoad = () => {

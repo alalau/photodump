@@ -90,12 +90,31 @@ body {
     opacity: 0;
 }
 
-#loader-text {
-    font-family: 'Libre Caslon Condensed', serif;
-    font-style: italic;
-    font-size: 42px;
-    color: #ffffff;
-    user-select: none;
+#loader-content {
+    position: relative;
+    width: 96px;
+    height: 96px;
+}
+
+#loader-wordmark {
+    width: 96px;
+    height: 96px;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#loader-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: rotate(-90deg);
+}
+
+#loader-circle {
+    stroke-dasharray: 295.3;
+    stroke-dashoffset: 295.3;
+    transition: stroke-dashoffset 0.3s ease;
 }
 
 #ui-container {
