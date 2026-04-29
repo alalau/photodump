@@ -29,10 +29,6 @@ const loaderCircle = document.getElementById('loader-circle');
 const circumference = 2 * Math.PI * 47; // Radius is 47
 
 // Loading Manager for elegant entry
-THREE.DefaultLoadingManager.onStart = () => {
-    if (loaderCircle) loaderCircle.style.strokeDashoffset = circumference;
-};
-
 THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
     if (!itemsTotal) return;
     const progress = itemsLoaded / itemsTotal;
@@ -328,7 +324,6 @@ const totalHeight = rows * cellHeight;
 let currentAlbum = 'All photos';
 let allAlbums = []; // will be populated from albums.json
 let albumPhotosMap = {}; // Cache to store photo lists
-let globalManifest = null; // Will store the production-safe manifest.json
 
 const textureLoader = new THREE.TextureLoader();
 // Start with a dummy texture to avoid modulo by zero during initial grid generation
@@ -337,14 +332,7 @@ let textures = [new THREE.Texture()];
 async function fetchPhotosForAlbum(albumName) {
     if (albumPhotosMap[albumName]) return albumPhotosMap[albumName];
 
-    // Production-safe method: Use manifest.json if available
-    if (globalManifest && globalManifest[albumName]) {
-        const photos = globalManifest[albumName].map(file => `albums/${albumName}/${file}`);
-        albumPhotosMap[albumName] = photos;
-        return photos;
-    }
-
-    // Local-only fallback: Parse directory listing HTML
+    // Automatic discovery: Parse directory listing HTML
     try {
         const response = await fetch(`albums/${albumName}/`);
         if (!response.ok) return [];
@@ -357,7 +345,7 @@ async function fetchPhotosForAlbum(albumName) {
         links.forEach(link => {
             const href = link.getAttribute('href');
             if (href && href.match(/\.(jpe?g|png|gif|webp)$/i)) {
-                // Ensure we don't double-prefix if the link is relative
+                // Ensure we don't double-prefix and handle absolute/relative paths from different server types
                 const cleanHref = href.split('/').pop();
                 photos.push(`albums/${albumName}/${cleanHref}`);
             }
@@ -692,16 +680,6 @@ async function loadAlbums() {
         if (!response.ok) throw new Error('Failed to load albums configuration JSON');
 
         allAlbums = await response.json();
-
-        // Load the production manifest if it exists
-        try {
-            const manifestResponse = await fetch('albums/manifest.json');
-            if (manifestResponse.ok) {
-                globalManifest = await manifestResponse.json();
-            }
-        } catch (e) {
-            console.warn("No manifest.json found, falling back to directory listing.");
-        }
         const albumList = document.getElementById('album-list');
 
         function closeMenu() {
