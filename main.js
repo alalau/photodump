@@ -24,6 +24,27 @@ let backgroundFade = 0;
 let mouseDownPos = { x: 0, y: 0 };
 
 const uiContainer = document.getElementById('ui-container');
+const loader = document.getElementById('loader');
+const loaderText = document.getElementById('loader-text');
+
+// Loading Manager for elegant entry
+THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    const progress = Math.round((itemsLoaded / itemsTotal) * 100);
+    if (loaderText) loaderText.textContent = `${progress}%`;
+};
+
+THREE.DefaultLoadingManager.onLoad = () => {
+    setTimeout(() => {
+        if (loader) loader.classList.add('fade-out');
+        if (uiContainer) uiContainer.classList.add('visible');
+        if (container) container.classList.add('visible');
+        
+        // Remove loader from DOM after transition
+        setTimeout(() => {
+            if (loader) loader.remove();
+        }, 1000);
+    }, 500);
+};
 
 function setZoomMesh(mesh) {
     if (zoomedMesh && mesh && mesh !== zoomedMesh) {
