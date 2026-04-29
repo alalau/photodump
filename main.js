@@ -104,8 +104,8 @@ window.addEventListener('pointermove', (event) => {
 window.addEventListener('pointerup', (event) => {
     isDragging = false;
 
-    // Ignore clicks that landed directly on our UI buttons or menu container
-    if (event.target.tagName === 'BUTTON' || event.target.closest('#menu-btn-container') || event.target.closest('#album-menu') || event.target.closest('.nav-btn-container')) return;
+    // Ignore clicks that landed directly on our UI buttons, menus, or overlays
+    if (event.target.tagName === 'BUTTON' || event.target.closest('#menu-btn-container') || event.target.closest('#album-menu') || event.target.closest('#artist-statement') || event.target.closest('#scrim') || event.target.closest('.nav-btn-container')) return;
 
     // Calculate distance the mouse travelled while held down
     const dist = Math.hypot(event.clientX - mouseDownPos.x, event.clientY - mouseDownPos.y);
@@ -188,20 +188,45 @@ document.querySelector('.nav-btn-container.right').addEventListener('click', (ev
     handleCycle('ArrowRight');
 });
 
-// Menu Overlay Control
+// Menu and Artist Statement Overlay Control
 const menuBtn = document.getElementById('menu-btn-container');
 const albumMenu = document.getElementById('album-menu');
 const scrim = document.getElementById('scrim');
+const artistStatement = document.getElementById('artist-statement');
+const pageTitleContainer = document.querySelector('.page-title-container');
 
-menuBtn.addEventListener('click', (event) => {
-    event.stopPropagation(); // Avoid raycaster triggering
-    const isOpen = albumMenu.classList.toggle('is-open');
+pageTitleContainer.addEventListener('click', (event) => {
+    event.stopPropagation();
+    
+    // Close album menu if open
+    albumMenu.classList.remove('is-open');
+    
+    const isOpen = artistStatement.classList.toggle('is-open');
     scrim.classList.toggle('is-open', isOpen);
     menuBtn.classList.toggle('is-active', isOpen);
 });
 
+// Prevent pointer events from bubbling to the window raycaster
+pageTitleContainer.addEventListener('pointerdown', (e) => e.stopPropagation());
+pageTitleContainer.addEventListener('pointerup', (e) => e.stopPropagation());
+
+menuBtn.addEventListener('click', (event) => {
+    event.stopPropagation(); // Avoid raycaster triggering
+    
+    if (artistStatement.classList.contains('is-open')) {
+        artistStatement.classList.remove('is-open');
+        scrim.classList.remove('is-open');
+        menuBtn.classList.remove('is-active');
+    } else {
+        const isOpen = albumMenu.classList.toggle('is-open');
+        scrim.classList.toggle('is-open', isOpen);
+        menuBtn.classList.toggle('is-active', isOpen);
+    }
+});
+
 scrim.addEventListener('click', () => {
     albumMenu.classList.remove('is-open');
+    artistStatement.classList.remove('is-open');
     scrim.classList.remove('is-open');
     menuBtn.classList.remove('is-active');
 });
@@ -210,6 +235,15 @@ albumMenu.addEventListener('click', (event) => {
     // Determine if the click landed on the empty background flex space rather than specific list items
     if (event.target === albumMenu || event.target.tagName === 'UL') {
         albumMenu.classList.remove('is-open');
+        scrim.classList.remove('is-open');
+        menuBtn.classList.remove('is-active');
+    }
+});
+
+artistStatement.addEventListener('click', (event) => {
+    // Close if clicking the background flex space
+    if (event.target === artistStatement) {
+        artistStatement.classList.remove('is-open');
         scrim.classList.remove('is-open');
         menuBtn.classList.remove('is-active');
     }
