@@ -28,7 +28,7 @@ const loader = document.getElementById('loader');
 const loaderCircle = document.getElementById('loader-circle');
 const circumference = 2 * Math.PI * 47; // Radius is 47
 
-// Loading Manager for elegant entry
+// Loading Manager for progress circle
 THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
     if (!itemsTotal) return;
     const progress = itemsLoaded / itemsTotal;
@@ -38,18 +38,20 @@ THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
     }
 };
 
-THREE.DefaultLoadingManager.onLoad = () => {
+// Reveal UI after website scaffolding is loaded, ignoring large photo loads
+window.addEventListener('load', () => {
+    // Show custom loader for a minimum of 250ms
     setTimeout(() => {
         if (loader) loader.classList.add('fade-out');
         if (uiContainer) uiContainer.classList.add('visible');
         if (container) container.classList.add('visible');
-        
+
         // Remove loader from DOM after transition
         setTimeout(() => {
             if (loader) loader.remove();
         }, 1000);
-    }, 500);
-};
+    }, 250);
+});
 
 function setZoomMesh(mesh) {
     if (zoomedMesh && mesh && mesh !== zoomedMesh) {
@@ -223,10 +225,10 @@ const pageTitleContainer = document.querySelector('.page-title-container');
 
 pageTitleContainer.addEventListener('click', (event) => {
     event.stopPropagation();
-    
+
     // Close album menu if open
     albumMenu.classList.remove('is-open');
-    
+
     const isOpen = artistStatement.classList.toggle('is-open');
     scrim.classList.toggle('is-open', isOpen);
     menuBtn.classList.toggle('is-active', isOpen);
@@ -238,7 +240,7 @@ pageTitleContainer.addEventListener('pointerup', (e) => e.stopPropagation());
 
 menuBtn.addEventListener('click', (event) => {
     event.stopPropagation(); // Avoid raycaster triggering
-    
+
     if (artistStatement.classList.contains('is-open')) {
         artistStatement.classList.remove('is-open');
         scrim.classList.remove('is-open');
@@ -325,9 +327,14 @@ let currentAlbum = 'All photos';
 let allAlbums = []; // will be populated from albums.json
 let albumPhotosMap = {}; // Cache to store photo lists
 
-const textureLoader = new THREE.TextureLoader();
-// Start with a dummy texture to avoid modulo by zero during initial grid generation
-let textures = [new THREE.Texture()];
+const imageBitmapLoader = new THREE.ImageBitmapLoader();
+imageBitmapLoader.setOptions({ imageOrientation: 'flipY', resizeWidth: 1024, resizeQuality: 'medium' });
+const textureCache = {}; // { 'url': { status: 'queued' | 'loading' | 'loaded', texture: THREE.Texture } }
+const textureUploadQueue = []; // Queue to throttle GPU uploads
+const pendingDownloads = new Set(); // Queue to throttle concurrent background decodes
+let activeDownloads = 0;
+const MAX_CONCURRENT_DOWNLOADS = 4;
+let currentAlbumUrls = []; // Keep track of current URLs mapped to the grid
 
 async function fetchPhotosForAlbum(albumName) {
     if (albumPhotosMap[albumName]) return albumPhotosMap[albumName];
@@ -336,7 +343,7 @@ async function fetchPhotosForAlbum(albumName) {
     try {
         const response = await fetch(`albums/${albumName}/`);
         if (!response.ok) return [];
-        
+
         const html = await response.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
@@ -397,27 +404,31 @@ async function loadAlbumImages(albumName) {
         return;
     }
 
-    const newTextures = newUrls.map(url => {
-        const tex = textureLoader.load(url);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        return tex;
-    });
-
-    textures.forEach(tex => tex.dispose());
-    textures = newTextures;
+    currentAlbumUrls = newUrls;
 
     // Dynamically calculate a prime multiplier dynamically guaranteed to be coprime natively with the arbitrary dynamic photo count
     const primes = [17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
-    const safeOffsetPrime = primes.find(p => textures.length % p !== 0) || 17;
+    const safeOffsetPrime = primes.find(p => currentAlbumUrls.length % p !== 0) || 17;
 
     let index = 0;
     for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
             // Apply mathematically dynamic coprime to distribute natively and infinitely cleanly independent of arbitrary dataset sizes
-            const textureIndex = (i * safeOffsetPrime + j) % textures.length;
+            const urlIndex = (i * safeOffsetPrime + j) % currentAlbumUrls.length;
             const mesh = planes[index];
             if (mesh) {
-                mesh.material.map = textures[textureIndex];
+                const targetUrl = currentAlbumUrls[urlIndex];
+                mesh.userData.currentUrl = targetUrl;
+
+                // Apply immediately if already in cache (from previous album)
+                const cacheInfo = textureCache[targetUrl];
+                if (cacheInfo && cacheInfo.status === 'loaded') {
+                    mesh.material.map = cacheInfo.texture;
+                    mesh.userData.isLoaded = true;
+                } else {
+                    mesh.material.map = null;
+                    mesh.userData.isLoaded = false;
+                }
                 mesh.material.needsUpdate = true;
             }
             index++;
@@ -437,12 +448,12 @@ const planeGeo = new THREE.PlaneGeometry(cellWidth * photoScaleFactor, cellHeigh
 // Generate flat grid of Quads mapped to photos
 for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
-        const textureIndex = (i * 17 + j) % textures.length;
         const material = new THREE.MeshBasicMaterial({
-            map: textures[textureIndex],
+            map: null,
+            color: 0xffffff,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 1
+            opacity: 0.05
         });
 
         const mesh = new THREE.Mesh(planeGeo, material);
@@ -457,6 +468,8 @@ for (let i = 0; i < cols; i++) {
         mesh.userData.gridI = i;
         mesh.userData.gridJ = j;
         mesh.userData.zoomProgress = 0;
+        mesh.userData.currentUrl = null;
+        mesh.userData.isLoaded = false;
 
         // Generate and store a static random depth offset for this cell
         mesh.userData.randomZ = (Math.random() - 0.5) * 2 * randomDepthAmount;
@@ -529,12 +542,14 @@ function animate() {
         mesh.userData.zoomProgress += (targetZoomState - mesh.userData.zoomProgress) * zoomLerp;
         const zp = mesh.userData.zoomProgress;
 
+        const baseOpacity = mesh.userData.isLoaded ? 1 : 0.05;
+
         // Background Opacity Fading
         if (zp < 0.01) {
-            mesh.material.opacity = 1 - backgroundFade;
+            mesh.material.opacity = Math.max(0, baseOpacity - backgroundFade);
             mesh.renderOrder = 0;
         } else {
-            mesh.material.opacity = 1;
+            mesh.material.opacity = baseOpacity;
         }
 
         if (zp > 0.001) {
@@ -576,6 +591,121 @@ function animate() {
         mesh.rotation.y = targetRotY;
         mesh.scale.set(targetScaleX, targetScaleY, 1);
     }
+
+    // --- FRUSTUM CULLING & LAZY LOADING ---
+    // Calculate Screen Frustum Bounds dynamically
+    const depthDistance = camera.position.z; // approx distance of planes from camera at z=0 
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const screenH = 2 * Math.tan(vFov / 2) * depthDistance;
+    const screenW = screenH * camera.aspect;
+    const frustumBuffer = 2.5; // Load assets that are slightly off-screen to prevent pop-in, increased to reduce thrashing
+
+    const visibleUrls = new Set();
+
+    // Pass 1: Determine which URLs are visible within the padded frustum
+    for (const mesh of planes) {
+        if (!mesh.userData.currentUrl) continue;
+
+        // Use basic 2D bounding box logic since the camera looks straight down Z
+        const isVisible = mesh === zoomedMesh || (
+            Math.abs(mesh.position.x) < (screenW * frustumBuffer) / 2 &&
+            Math.abs(mesh.position.y) < (screenH * frustumBuffer) / 2
+        );
+
+        if (isVisible) {
+            visibleUrls.add(mesh.userData.currentUrl);
+        }
+    }
+
+    // Pass 2: Queue up ImageBitmapLoader for visible URLs not yet loaded
+    visibleUrls.forEach(url => {
+        if (!textureCache[url]) {
+            // Mark as queued to prevent duplicate requests
+            textureCache[url] = { status: 'queued', texture: null };
+            pendingDownloads.add(url);
+        }
+    });
+
+    // Pass 2.5: Process the background decode queue (Throttle CPU starvation)
+    // Limits concurrent decodes so we don't peg the CPU at 100% and drop frames
+    while (activeDownloads < MAX_CONCURRENT_DOWNLOADS && pendingDownloads.size > 0) {
+        const iterator = pendingDownloads.values();
+        const url = iterator.next().value;
+        pendingDownloads.delete(url);
+
+        // If it was scrolled out of view and disposed before we even started downloading, skip it
+        if (!textureCache[url] || textureCache[url].status !== 'queued') {
+            continue;
+        }
+
+        textureCache[url].status = 'loading';
+        activeDownloads++;
+
+        imageBitmapLoader.load(url, (imageBitmap) => {
+            activeDownloads--;
+            // Instead of uploading to GPU immediately, push to our time-slicing queue
+            if (textureCache[url] && textureCache[url].status === 'loading') {
+                textureUploadQueue.push({ url, imageBitmap });
+            } else {
+                imageBitmap.close();
+            }
+        }, undefined, (error) => {
+            console.error("Error loading image", url, error);
+            activeDownloads--;
+            delete textureCache[url];
+        });
+    }
+
+    // Pass 3: Process the GPU Upload Queue (Maximum 1 per frame)
+    if (textureUploadQueue.length > 0) {
+        const { url, imageBitmap } = textureUploadQueue.shift();
+
+        // Double check it wasn't scrolled out of view while waiting in the queue
+        if (textureCache[url] && textureCache[url].status === 'loading') {
+            const tex = new THREE.Texture(imageBitmap);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.generateMipmaps = false;
+            tex.minFilter = THREE.LinearFilter;
+            tex.needsUpdate = true;
+
+            textureCache[url].status = 'loaded';
+            textureCache[url].texture = tex;
+
+            // Assign to any mesh currently using this URL
+            planes.forEach(m => {
+                if (m.userData.currentUrl === url) {
+                    m.material.map = tex;
+                    m.userData.isLoaded = true;
+                    m.material.needsUpdate = true;
+                }
+            });
+        } else {
+            imageBitmap.close(); // Discard to save memory
+        }
+    }
+
+    // Pass 3: Dispose and clean up URLs that have completely exited the padded frustum
+    Object.keys(textureCache).forEach(url => {
+        if (!visibleUrls.has(url)) {
+            const cache = textureCache[url];
+            if (cache.status === 'loaded' && cache.texture) {
+                cache.texture.dispose();
+                if (cache.texture.image && cache.texture.image.close) {
+                    cache.texture.image.close(); // Clean up ImageBitmap
+                }
+            }
+            delete textureCache[url];
+
+            // Remove from meshes
+            planes.forEach(m => {
+                if (m.userData.currentUrl === url) {
+                    m.material.map = null;
+                    m.userData.isLoaded = false;
+                    m.material.needsUpdate = true;
+                }
+            });
+        }
+    });
 
     renderer.render(scene, camera);
 }
